@@ -1,6 +1,7 @@
 import streamlit as st
 import zipfile
 import os
+import io
 import pandas as pd
 import matplotlib.pyplot as plt
 from Pavone_Indent_Analysis import parse_file, extract_contact_points_from_data
@@ -13,15 +14,18 @@ st.set_page_config(layout="wide")
 # Initialize session state for current index if it doesn't already exist
 if 'current_index' not in st.session_state:
     st.session_state.current_index = 0
+    
+def create_new_classification_file(file_paths, output_filepath='classification.csv'):
+    file_data = [parse_file_path(file_path) for file_path in file_paths]
+    df = pd.DataFrame(file_data)
+    df.to_csv(output_filepath, index=False)
+    return df
 
 def get_classification_file(file_paths, output_filepath='classification.csv'):
     if os.path.exists(output_filepath):
         return pd.read_csv(output_filepath)
 
-    file_data = [parse_file_path(file_path) for file_path in file_paths]
-    df = pd.DataFrame(file_data)
-    df.to_csv(output_filepath, index=False)
-    return df
+    return create_new_classification_file(file_paths, output_filepath)
 
 def find_text_files(directory):
     text_files = []
@@ -72,16 +76,19 @@ def parse_file_path(file_path):
     }
 
 def load_data(file_path):
-    # file_path = os.path.join(base_directory, file_path)
+    file_path = os.path.join(st.session_state.extract_dir, file_path)
     metadata, data_df = parse_file(file_path)
     return metadata, data_df
 
-def plot_data(c, data_df):
-    fig, ax = plt.subplots()
+def plot_data(data_df):
+    fig, ax = plt.subplots(dpi=150)
     plt.plot(data_df['Time (s)'], data_df['Load (uN)'], '-')
     plt.xlabel('Time (s)')
     plt.ylabel('Load (μN)')
-    c.pyplot(fig)
+    plt.tight_layout()
+    img = io.BytesIO()
+    plt.savefig(img, format='png')
+    return fig, ax, img
 
 def save_results(df, output_file_path):
     df.to_csv(output_file_path, index=False)
@@ -185,14 +192,25 @@ col1.write(parts)
 metadata, data_df = load_data(file_path)
 class_idx = df.loc[st.session_state.current_index, 'classification']
 class_str = 'Good' if class_idx == 1 else 'Bad' if class_idx == 0 else 'Unclassified'
-col2.markdown(f'### Classification: {class_str}')
+col2_left.markdown(f'### Classification: {class_str}')
 
-plot_data(col2, data_df)
+fig, ax, img = plot_data(data_df)
+
+image_filename = parts['filename'].replace('.txt', '.png')
+
+btn = col2_right.download_button(
+   label="Download figure",
+   data=img,
+   file_name=image_filename,
+   mime="image/png"
+)
+col2.pyplot(fig)
 
 st.divider()
 st.markdown('#### Download data:')
+if st.button('Reset classifications:'):
+    create_new_classification_file(files, class_file_path)
+    st.rerun()
+
 st.write(df)
-
-st.divider()
-st.markdown('### Download figures:')
-
+    
