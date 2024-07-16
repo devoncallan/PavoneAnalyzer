@@ -81,7 +81,7 @@ def parse_pavone_filepath(file_path):
 
     return {
         'filepath': file_path,
-        'date': date,
+        'date': str(date),
         'experiment_code': experiment_code,
         'plate_number': plate_number,
         'well_number': well_number,
@@ -91,12 +91,13 @@ def parse_pavone_filepath(file_path):
         'Y': Y,
         'I': I,
         'filename': filename,
-        'classification': -1
+        'classification': int(-1)
     }
     
 def create_new_classification_file(file_paths, output_filepath='classification.csv'):
     file_data = [parse_pavone_filepath(file_path) for file_path in file_paths]
     df = pd.DataFrame(file_data)
+    df = df.sort_values(by=['experiment_code', 'well_number'])
     return df
 
 def get_classification_file(file_paths, class_file_path='classification.csv'):
