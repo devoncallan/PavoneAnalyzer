@@ -124,12 +124,13 @@ def extract_zip_file(uploaded_file):
 
     return extract_dir
 
-@st.cache_data
+# @st.cache_data
 def load_classification_data(extract_dir, exp_name):
     print('Loading classification data...')
     base_directory = extract_dir
     class_file_path = f'{exp_name}.csv'
     files = find_text_files(base_directory)
+    print(files)
 
     return files, class_file_path
 

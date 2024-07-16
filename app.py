@@ -1,35 +1,193 @@
 import streamlit as st
-from Pavone_Indent_Analysis import parse_file, extract_contact_points_from_data
+import zipfile
+import os
+import io
+import pandas as pd
 import matplotlib.pyplot as plt
+from Pavone_Indent_Analysis import parse_file, extract_contact_points_from_data
 
+st.set_page_config(layout="wide")
 
-
-print('hi')
-
-st.title('Pavone Analyzer')
-
-file = st.file_uploader('Upload files')
-
-if not file:
-    st.stop()
+# Initialize session state for current index if it doesn't already exist
+if 'current_index' not in st.session_state:
+    st.session_state.current_index = 0
     
-metadata, data_df = parse_file(uploaded_file=file)
+def create_new_classification_file(file_paths, output_filepath='classification.csv'):
+    file_data = [parse_file_path(file_path) for file_path in file_paths]
+    df = pd.DataFrame(file_data)
+    df.to_csv(output_filepath, index=False)
+    return df
 
-# Data cleaning
-data_df['Z-stage (nm)'] = data_df['Piezo (nm)'] - data_df['Cantilever (nm)']
+def get_classification_file(file_paths, output_filepath='classification.csv'):
+    if os.path.exists(output_filepath):
+        return pd.read_csv(output_filepath)
 
-# Potentially reduce number of data points (quite excessive)
-# Add columns or change for alternative units (um)
-data_df
+    return create_new_classification_file(file_paths, output_filepath)
 
-start_idx, end_idx = extract_contact_points_from_data(data_df)
+def find_text_files(directory):
+    text_files = []
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            if file.endswith('.txt') and 'position' not in file.lower() and 'test' not in file.lower():
+                relative_path = os.path.relpath(os.path.join(root, file), start=directory)
+                text_files.append(os.path.join(directory, relative_path))
+    return text_files
 
-fig, ax = plt.subplots()
-plt.plot(data_df['Time (s)'], data_df['Load (uN)'], 'o')
-# plt.axvline(x=0.240, color='k')
-# plt.axvline(x=57.471, color='k')
-# plt.axvline(x=114.703, color='k')
-plt.axvline(x=data_df['Time (s)'][start_idx], color='r')
-plt.axvline(x=data_df['Time (s)'][end_idx], color='r')
-st.pyplot(fig)
+def parse_file_path(file_path):
+    # print(file_path)
+    parts = file_path.split('/')
+    base_dir = parts[0]
+    experiment_info = parts[1]
+    plate_info = parts[2]
+    scan_info = parts[3]
+    filename = parts[4]
 
+    experiment_details = experiment_info.split('_')
+    date = experiment_details[0]
+    experiment_code = '_'.join(experiment_details[1:])
+
+    plate_details = plate_info.split('_')
+    plate_number = plate_details[0]
+    well_number = plate_details[1]
+
+    filename_details = filename.split('_')
+    coordinates_info = filename.split(' ')[-4:]
+
+    S = coordinates_info[0]
+    X = coordinates_info[1]
+    Y = coordinates_info[2]
+    I = coordinates_info[3].split('.')[0]
+
+    return {
+        'filepath': file_path,
+        'date': date,
+        'experiment_code': experiment_code,
+        'plate_number': plate_number,
+        'well_number': well_number,
+        'scan_info': scan_info,
+        'S': S,
+        'X': X,
+        'Y': Y,
+        'I': I,
+        'filename': filename,
+        'classification': -1
+    }
+
+def load_data(file_path):
+    metadata, data_df = parse_file(file_path)
+    return metadata, data_df
+
+def plot_data(data_df):
+    fig, ax = plt.subplots(dpi=150)
+    plt.plot(data_df['Time (s)'], data_df['Load (uN)'], '-')
+    plt.xlabel('Time (s)')
+    plt.ylabel('Load (μN)')
+    plt.tight_layout()
+    img = io.BytesIO()
+    plt.savefig(img, format='png')
+    return fig, ax, img
+
+def save_results(df, output_file_path):
+    df.to_csv(output_file_path, index=False)
+
+def update_classification(df, index, classification=-1):
+    if index in df.index:
+        df.at[index, 'classification'] = classification
+    else:
+        print(f'No row found at index {index}')
+    return df
+
+def increment_index(df):
+    if st.session_state.current_index < len(df) - 1:
+        st.session_state.current_index += 1
+    else:
+        st.session_state.current_index = 0
+
+@st.cache_data
+def load_classification_data(data_dir):
+    print('Loading classification data...')
+    exp_name = os.path.basename(data_dir)
+    class_file_path = f'{exp_name}.csv'
+    files = find_text_files(data_dir)
+    # print(files)
+    return files, class_file_path
+
+st.title('Pavone Data Classifier')
+
+base_dir = '2024_07_08_ChemspeedSamples'
+
+# exp_name = os.path.basename(st.session_state.extract_dir)
+files, class_file_path = load_classification_data(base_dir)
+df = get_classification_file(files, class_file_path)
+
+col1, col2 = st.columns([1, 1])
+col1_left, col1_right = col1.columns([1, 1])
+col2_left, col2_right = col2.columns([1, 1])
+
+if col1_left.button('⬅️ Previous', use_container_width=True) and st.session_state.current_index > 0:
+    st.session_state.current_index -= 1
+    # print('Previous rerun!')
+    st.rerun()
+
+if col1_right.button('Next ➡️', use_container_width=True) and st.session_state.current_index < len(files) - 1:
+    st.session_state.current_index += 1
+    # print('Next rerun!')
+    st.rerun()
+
+if col2_left.button('Bad', type='secondary', use_container_width=True):
+    update_classification(df, st.session_state.current_index, 0)
+    save_results(df, class_file_path)
+    increment_index(df)
+
+if col2_right.button(label='Good', type='primary', use_container_width=True):
+    update_classification(df, st.session_state.current_index, 1)
+    save_results(df, class_file_path)
+    increment_index(df)
+
+file_path = files[st.session_state.current_index]
+parts = dict(df.loc[st.session_state.current_index])
+# parts = parse_file_path(file_path)
+
+jump_to = col1.number_input('Jump to index', min_value=0, max_value=len(df)-1, value=st.session_state.current_index)
+if jump_to != st.session_state.current_index:
+    st.session_state.current_index = jump_to
+    # print('Jump rerun!')
+    st.rerun()
+
+col1.markdown(f'#### Experiment {st.session_state.current_index} Info:')
+col1.write(parts)
+
+metadata, data_df = load_data(file_path)
+# class_idx = df.loc[st.session_state.current_index, 'classification']
+# class_str = 'Good' if class_idx == 1 else 'Bad' if class_idx == 0 else 'Unclassified'
+# col2_left.markdown(f'### Classification: {class_str}')
+class_idx = df.loc[st.session_state.current_index, 'classification']
+class_str = 'Good' if class_idx == 1 else 'Bad' if class_idx == 0 else 'Unclassified'
+
+# Define color based on classification
+color = 'green' if class_str == 'Good' else 'red' if class_str == 'Bad' else 'gray'
+
+# Use the color in the markdown with inline CSS
+col2_left.markdown(f'### Classification: <span style="color: {color};">{class_str}</span>', unsafe_allow_html=True)
+
+
+fig, ax, img = plot_data(data_df)
+
+image_filename = parts['filename'].replace('.txt', '.png')
+
+btn = col2_right.download_button(
+   label="Download figure",
+   data=img,
+   file_name=image_filename,
+   mime="image/png"
+)
+col2.pyplot(fig)
+
+st.divider()
+st.markdown('#### Download data:')
+if st.button('Reset classifications:'):
+    create_new_classification_file(files, class_file_path)
+    st.rerun()
+
+st.write(df)
+    
