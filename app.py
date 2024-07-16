@@ -14,102 +14,12 @@ st.set_page_config(layout="wide")
 if 'current_index' not in st.session_state:
     st.session_state.current_index = 0
     
-# def create_new_classification_file(file_paths, output_filepath='classification.csv'):
-#     file_data = [parse_file_path(file_path) for file_path in file_paths]
-#     df = pd.DataFrame(file_data)
-#     df.to_csv(output_filepath, index=False)
-#     return df
-
-# def get_classification_file(file_paths, output_filepath='classification.csv'):
-#     if os.path.exists(output_filepath):
-#         return pd.read_csv(output_filepath)
-
-#     return create_new_classification_file(file_paths, output_filepath)
-
-# def find_text_files(directory):
-#     text_files = []
-#     for root, dirs, files in os.walk(directory):
-#         for file in files:
-#             if file.endswith('.txt') and 'position' not in file.lower() and 'test' not in file.lower():
-#                 relative_path = os.path.relpath(os.path.join(root, file), start=directory)
-#                 text_files.append(os.path.join(directory, relative_path))
-#     return text_files
-
-# def find_all_files(directory, type='txt', exclude=[]):
-#     all_files = []
-#     for root, dirs, files in os.walk(directory):
-#         for file in files:
-#             if file.endswith(f'.{type}') and not any([x in file for x in exclude]):
-#                 relative_path = os.path.relpath(os.path.join(root, file), start=directory)
-#                 all_files.append(os.path.join(directory, relative_path))
-#     return all_files
-
-# def parse_file_path(file_path):
-#     # print(file_path)
-#     parts = file_path.split('/')
-#     base_dir = parts[0]
-#     experiment_info = parts[1]
-#     plate_info = parts[2]
-#     scan_info = parts[3]
-#     filename = parts[4]
-
-#     experiment_details = experiment_info.split('_')
-#     date = experiment_details[0]
-#     experiment_code = '_'.join(experiment_details[1:])
-
-#     plate_details = plate_info.split('_')
-#     plate_number = plate_details[0]
-#     well_number = plate_details[1]
-
-#     filename_details = filename.split('_')
-#     coordinates_info = filename.split(' ')[-4:]
-
-#     S = coordinates_info[0]
-#     X = coordinates_info[1]
-#     Y = coordinates_info[2]
-#     I = coordinates_info[3].split('.')[0]
-
-#     return {
-#         'filepath': file_path,
-#         'date': date,
-#         'experiment_code': experiment_code,
-#         'plate_number': plate_number,
-#         'well_number': well_number,
-#         'scan_info': scan_info,
-#         'S': S,
-#         'X': X,
-#         'Y': Y,
-#         'I': I,
-#         'filename': filename,
-#         'classification': -1
-#     }
-
-# def load_data(file_path):
-#     metadata, data_df = parse_file(file_path)
-#     return metadata, data_df
-
-# def plot_data(data_df):
-#     fig, ax = plt.subplots(dpi=150)
-#     plt.plot(data_df['Time (s)'], data_df['Load (uN)'], '-')
-#     plt.xlabel('Time (s)')
-#     plt.ylabel('Load (μN)')
-#     plt.tight_layout()
-#     img = io.BytesIO()
-#     plt.savefig(img, format='png')
-#     return fig, ax, img
-
-# def save_results(df, output_file_path):
-#     df.to_csv(output_file_path, index=False)
-
 
 def increment_index(max_index):
     if st.session_state.current_index < max_index - 1:
         st.session_state.current_index += 1
     else:
         st.session_state.current_index = 0
-
-
-
 
 # Locate Pavone data from the specified directory
 data_dir = '2024_07_08_ChemspeedSamples'
@@ -149,11 +59,6 @@ if c1R.button('Next unclassified ➡️', use_container_width=True):
     st.session_state.current_index = next_unclassified
     st.rerun()
     
-# c1L, c1R = c1.columns([1, 1])
-    
-
-    
-
 
 # Define bad and good classification buttons
 if c2L.button(':thumbsdown:', type='secondary', use_container_width=True):
@@ -208,9 +113,8 @@ c.divider()
 c1, c2 = c.columns([1, 1])
 c1.markdown('#### Download data:')
 c.write(class_df)
+
 if c.button('Reset classifications'):
     class_df = create_new_classification_file(pavone_files, class_file_path)
     class_df.to_csv(class_file_path, index=False)
     st.rerun()
-# st.write(class_df)
-    
