@@ -6,6 +6,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from Pavone_Indent_Analysis import parse_file, extract_contact_points_from_data
 
+from parse_pavone import parse_pavone_filepath
+
 print('howdy')
 st.set_page_config(layout="wide")
 
@@ -16,7 +18,7 @@ if 'current_index' not in st.session_state:
     st.session_state.current_index = 0
     
 def create_new_classification_file(file_paths, output_filepath='classification.csv'):
-    file_data = [parse_file_path(file_path) for file_path in file_paths]
+    file_data = [parse_pavone_filepath(file_path) for file_path in file_paths]
     df = pd.DataFrame(file_data)
     df.to_csv(output_filepath, index=False)
     return df
@@ -36,59 +38,20 @@ def find_text_files(directory):
                 text_files.append(relative_path)
     return text_files
 
-def parse_file_path(file_path):
-    parts = file_path.split('/')
-    base_directory = parts[0]
-    experiment_info = parts[1]
-    plate_info = parts[2]
-    scan_info = parts[3]
-    filename = parts[4]
-
-    experiment_details = experiment_info.split('_')
-    date = experiment_details[0]
-    experiment_code = '_'.join(experiment_details[1:])
-
-    plate_details = plate_info.split('_')
-    plate_number = plate_details[0]
-    well_number = plate_details[1]
-
-    filename_details = filename.split('_')
-    coordinates_info = filename.split(' ')[-4:]
-
-    S = coordinates_info[0]
-    X = coordinates_info[1]
-    Y = coordinates_info[2]
-    I = coordinates_info[3].split('.')[0]
-
-    return {
-        'filepath': file_path,
-        'date': date,
-        'experiment_code': experiment_code,
-        'plate_number': plate_number,
-        'well_number': well_number,
-        'scan_info': scan_info,
-        'S': S,
-        'X': X,
-        'Y': Y,
-        'I': I,
-        'filename': filename,
-        'classification': -1
-    }
-
 def load_data(file_path):
     file_path = os.path.join(st.session_state.extract_dir, file_path)
     metadata, data_df = parse_file(file_path)
     return metadata, data_df
 
-def plot_data(data_df):
-    fig, ax = plt.subplots(dpi=150)
-    plt.plot(data_df['Time (s)'], data_df['Load (uN)'], '-')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Load (μN)')
-    plt.tight_layout()
-    img = io.BytesIO()
-    plt.savefig(img, format='png')
-    return fig, ax, img
+# def plot_data(data_df):
+#     fig, ax = plt.subplots(dpi=150)
+#     plt.plot(data_df['Time (s)'], data_df['Load (uN)'], '-')
+#     plt.xlabel('Time (s)')
+#     plt.ylabel('Load (μN)')
+#     plt.tight_layout()
+#     img = io.BytesIO()
+#     plt.savefig(img, format='png')
+#     return fig, ax, img
 
 def save_results(df, output_file_path):
     df.to_csv(output_file_path, index=False)

@@ -6,188 +6,211 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from Pavone_Indent_Analysis import parse_file, extract_contact_points_from_data
 
+from parse_pavone import parse_pavone_filepath, locate_pavone_data, create_new_classification_file, get_classification_file, update_classification, plot_pavone_data, read_pavone_data
+
 st.set_page_config(layout="wide")
 
 # Initialize session state for current index if it doesn't already exist
 if 'current_index' not in st.session_state:
     st.session_state.current_index = 0
     
-def create_new_classification_file(file_paths, output_filepath='classification.csv'):
-    file_data = [parse_file_path(file_path) for file_path in file_paths]
-    df = pd.DataFrame(file_data)
-    df.to_csv(output_filepath, index=False)
-    return df
+# def create_new_classification_file(file_paths, output_filepath='classification.csv'):
+#     file_data = [parse_file_path(file_path) for file_path in file_paths]
+#     df = pd.DataFrame(file_data)
+#     df.to_csv(output_filepath, index=False)
+#     return df
 
-def get_classification_file(file_paths, output_filepath='classification.csv'):
-    if os.path.exists(output_filepath):
-        return pd.read_csv(output_filepath)
+# def get_classification_file(file_paths, output_filepath='classification.csv'):
+#     if os.path.exists(output_filepath):
+#         return pd.read_csv(output_filepath)
 
-    return create_new_classification_file(file_paths, output_filepath)
+#     return create_new_classification_file(file_paths, output_filepath)
 
-def find_text_files(directory):
-    text_files = []
-    for root, dirs, files in os.walk(directory):
-        for file in files:
-            if file.endswith('.txt') and 'position' not in file.lower() and 'test' not in file.lower():
-                relative_path = os.path.relpath(os.path.join(root, file), start=directory)
-                text_files.append(os.path.join(directory, relative_path))
-    return text_files
+# def find_text_files(directory):
+#     text_files = []
+#     for root, dirs, files in os.walk(directory):
+#         for file in files:
+#             if file.endswith('.txt') and 'position' not in file.lower() and 'test' not in file.lower():
+#                 relative_path = os.path.relpath(os.path.join(root, file), start=directory)
+#                 text_files.append(os.path.join(directory, relative_path))
+#     return text_files
 
-def parse_file_path(file_path):
-    # print(file_path)
-    parts = file_path.split('/')
-    base_dir = parts[0]
-    experiment_info = parts[1]
-    plate_info = parts[2]
-    scan_info = parts[3]
-    filename = parts[4]
+# def find_all_files(directory, type='txt', exclude=[]):
+#     all_files = []
+#     for root, dirs, files in os.walk(directory):
+#         for file in files:
+#             if file.endswith(f'.{type}') and not any([x in file for x in exclude]):
+#                 relative_path = os.path.relpath(os.path.join(root, file), start=directory)
+#                 all_files.append(os.path.join(directory, relative_path))
+#     return all_files
 
-    experiment_details = experiment_info.split('_')
-    date = experiment_details[0]
-    experiment_code = '_'.join(experiment_details[1:])
+# def parse_file_path(file_path):
+#     # print(file_path)
+#     parts = file_path.split('/')
+#     base_dir = parts[0]
+#     experiment_info = parts[1]
+#     plate_info = parts[2]
+#     scan_info = parts[3]
+#     filename = parts[4]
 
-    plate_details = plate_info.split('_')
-    plate_number = plate_details[0]
-    well_number = plate_details[1]
+#     experiment_details = experiment_info.split('_')
+#     date = experiment_details[0]
+#     experiment_code = '_'.join(experiment_details[1:])
 
-    filename_details = filename.split('_')
-    coordinates_info = filename.split(' ')[-4:]
+#     plate_details = plate_info.split('_')
+#     plate_number = plate_details[0]
+#     well_number = plate_details[1]
 
-    S = coordinates_info[0]
-    X = coordinates_info[1]
-    Y = coordinates_info[2]
-    I = coordinates_info[3].split('.')[0]
+#     filename_details = filename.split('_')
+#     coordinates_info = filename.split(' ')[-4:]
 
-    return {
-        'filepath': file_path,
-        'date': date,
-        'experiment_code': experiment_code,
-        'plate_number': plate_number,
-        'well_number': well_number,
-        'scan_info': scan_info,
-        'S': S,
-        'X': X,
-        'Y': Y,
-        'I': I,
-        'filename': filename,
-        'classification': -1
-    }
+#     S = coordinates_info[0]
+#     X = coordinates_info[1]
+#     Y = coordinates_info[2]
+#     I = coordinates_info[3].split('.')[0]
 
-def load_data(file_path):
-    metadata, data_df = parse_file(file_path)
-    return metadata, data_df
+#     return {
+#         'filepath': file_path,
+#         'date': date,
+#         'experiment_code': experiment_code,
+#         'plate_number': plate_number,
+#         'well_number': well_number,
+#         'scan_info': scan_info,
+#         'S': S,
+#         'X': X,
+#         'Y': Y,
+#         'I': I,
+#         'filename': filename,
+#         'classification': -1
+#     }
 
-def plot_data(data_df):
-    fig, ax = plt.subplots(dpi=150)
-    plt.plot(data_df['Time (s)'], data_df['Load (uN)'], '-')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Load (μN)')
-    plt.tight_layout()
-    img = io.BytesIO()
-    plt.savefig(img, format='png')
-    return fig, ax, img
+# def load_data(file_path):
+#     metadata, data_df = parse_file(file_path)
+#     return metadata, data_df
 
-def save_results(df, output_file_path):
-    df.to_csv(output_file_path, index=False)
+# def plot_data(data_df):
+#     fig, ax = plt.subplots(dpi=150)
+#     plt.plot(data_df['Time (s)'], data_df['Load (uN)'], '-')
+#     plt.xlabel('Time (s)')
+#     plt.ylabel('Load (μN)')
+#     plt.tight_layout()
+#     img = io.BytesIO()
+#     plt.savefig(img, format='png')
+#     return fig, ax, img
 
-def update_classification(df, index, classification=-1):
-    if index in df.index:
-        df.at[index, 'classification'] = classification
-    else:
-        print(f'No row found at index {index}')
-    return df
+# def save_results(df, output_file_path):
+#     df.to_csv(output_file_path, index=False)
 
-def increment_index(df):
-    if st.session_state.current_index < len(df) - 1:
+
+def increment_index(max_index):
+    if st.session_state.current_index < max_index - 1:
         st.session_state.current_index += 1
     else:
         st.session_state.current_index = 0
 
-@st.cache_data
-def load_classification_data(data_dir):
-    print('Loading classification data...')
-    exp_name = os.path.basename(data_dir)
-    class_file_path = f'{exp_name}.csv'
-    files = find_text_files(data_dir)
-    # print(files)
-    return files, class_file_path
 
-st.title('Pavone Data Classifier')
 
-base_dir = '2024_07_08_ChemspeedSamples'
 
-# exp_name = os.path.basename(st.session_state.extract_dir)
-files, class_file_path = load_classification_data(base_dir)
-df = get_classification_file(files, class_file_path)
+# Locate Pavone data from the specified directory
+data_dir = '2024_07_08_ChemspeedSamples'
+pavone_files = locate_pavone_data(data_dir)
+num_files = len(pavone_files)
 
-col1, col2 = st.columns([1, 1])
-col1_left, col1_right = col1.columns([1, 1])
-col2_left, col2_right = col2.columns([1, 1])
+# Get the current classification file
+class_file_path = f'{data_dir}.csv'
+if os.path.exists(class_file_path):
+    class_df = get_classification_file(pavone_files, class_file_path)
+else:
+    class_df = create_new_classification_file(pavone_files, class_file_path)
+    
+num_classified = num_files - int((class_df['classification'] == -1).sum())
+    
+c1, c2 = st.columns([1, 1])
+c1.title('Pavone Data Classifier:')
+c2.title(f'{num_classified} / {num_files} classified')
 
-if col1_left.button('⬅️ Previous', use_container_width=True) and st.session_state.current_index > 0:
-    st.session_state.current_index -= 1
-    # print('Previous rerun!')
+if num_classified >= num_files:
+    st.balloons()
+
+# Define streamlit panels
+c1, c2 = st.columns([1, 1])
+c1L, c1C, c1R= c1.columns([1, 1, 1])
+c2L, c2R = c2.columns([1, 1])
+
+
+c1L.markdown('##### Jump to index:')
+new_index = c1C.number_input('Jump to index', min_value=0, max_value=num_files-1, value=st.session_state.current_index, label_visibility='collapsed')
+if new_index != st.session_state.current_index:
+    st.session_state.current_index = new_index
+    st.rerun()
+    
+if c1R.button('Next unclassified ➡️', use_container_width=True):
+    next_unclassified = class_df[class_df['classification'] == -1].index[0]
+    st.session_state.current_index = next_unclassified
+    st.rerun()
+    
+# c1L, c1R = c1.columns([1, 1])
+    
+
+    
+
+
+# Define bad and good classification buttons
+if c2L.button(':thumbsdown:', type='secondary', use_container_width=True):
+    update_classification(class_df, st.session_state.current_index, 0)
+    class_df.to_csv(class_file_path, index=False)
+    increment_index(max_index=num_files)
     st.rerun()
 
-if col1_right.button('Next ➡️', use_container_width=True) and st.session_state.current_index < len(files) - 1:
-    st.session_state.current_index += 1
-    # print('Next rerun!')
+if c2R.button(label=':thumbsup:', type='primary', use_container_width=True):
+    update_classification(class_df, st.session_state.current_index, 1)
+    class_df.to_csv(class_file_path, index=False)
+    increment_index(max_index=num_files)
     st.rerun()
 
-if col2_left.button('Bad', type='secondary', use_container_width=True):
-    update_classification(df, st.session_state.current_index, 0)
-    save_results(df, class_file_path)
-    increment_index(df)
 
-if col2_right.button(label='Good', type='primary', use_container_width=True):
-    update_classification(df, st.session_state.current_index, 1)
-    save_results(df, class_file_path)
-    increment_index(df)
+file_path = pavone_files[st.session_state.current_index]
+file_info = dict(class_df.loc[st.session_state.current_index])
+metadata, data_df = read_pavone_data(file_path)
 
-file_path = files[st.session_state.current_index]
-parts = dict(df.loc[st.session_state.current_index])
-# parts = parse_file_path(file_path)
+c1.markdown('')
+c1.markdown(f'#### Experiment {st.session_state.current_index} Info:')
+c1.write(file_info)
 
-jump_to = col1.number_input('Jump to index', min_value=0, max_value=len(df)-1, value=st.session_state.current_index)
-if jump_to != st.session_state.current_index:
-    st.session_state.current_index = jump_to
-    # print('Jump rerun!')
-    st.rerun()
-
-col1.markdown(f'#### Experiment {st.session_state.current_index} Info:')
-col1.write(parts)
-
-metadata, data_df = load_data(file_path)
-# class_idx = df.loc[st.session_state.current_index, 'classification']
-# class_str = 'Good' if class_idx == 1 else 'Bad' if class_idx == 0 else 'Unclassified'
-# col2_left.markdown(f'### Classification: {class_str}')
-class_idx = df.loc[st.session_state.current_index, 'classification']
-class_str = 'Good' if class_idx == 1 else 'Bad' if class_idx == 0 else 'Unclassified'
-
-# Define color based on classification
-color = 'green' if class_str == 'Good' else 'red' if class_str == 'Bad' else 'gray'
+# Define string and color based on classification
+class_val = class_df.loc[st.session_state.current_index, 'classification']
+class_str = 'Good' if class_val == 1 else 'Bad' if class_val == 0 else 'Unclassified'
+class_color = 'green' if class_str == 'Good' else 'red' if class_str == 'Bad' else 'gray'
 
 # Use the color in the markdown with inline CSS
-col2_left.markdown(f'### Classification: <span style="color: {color};">{class_str}</span>', unsafe_allow_html=True)
+c2L, c2R = c2.columns([6, 1])
+c2L.markdown(f'#### Classification: <span style="color: {class_color};">{class_str}</span>', unsafe_allow_html=True)
 
 
-fig, ax, img = plot_data(data_df)
+# Plot Pavone data
+fig, ax, img = plot_pavone_data(data_df, savefig=True)
 
-image_filename = parts['filename'].replace('.txt', '.png')
+image_filename = file_info['filename'].replace('.txt', '.png')
 
-btn = col2_right.download_button(
-   label="Download figure",
+btn = c2R.download_button(
+   label=":floppy_disk:",
    data=img,
    file_name=image_filename,
-   mime="image/png"
+   mime="image/png",
+   use_container_width=True
 )
-col2.pyplot(fig)
+c2.pyplot(fig)
 
-st.divider()
-st.markdown('#### Download data:')
-if st.button('Reset classifications:'):
-    create_new_classification_file(files, class_file_path)
+
+### Display
+c = st.container()
+c.divider()
+c1, c2 = c.columns([1, 1])
+c1.markdown('#### Download data:')
+c.write(class_df)
+if c.button('Reset classifications'):
+    class_df = create_new_classification_file(pavone_files, class_file_path)
+    class_df.to_csv(class_file_path, index=False)
     st.rerun()
-
-st.write(df)
+# st.write(class_df)
     
