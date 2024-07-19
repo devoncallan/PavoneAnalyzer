@@ -32,7 +32,8 @@ if os.path.exists(class_file_path):
     class_df = get_classification_file(pavone_files, class_file_path)
 else:
     class_df = create_new_classification_file(pavone_files, class_file_path)
-    
+
+pavone_files = class_df['filepath'].tolist()
 num_classified = num_files - int((class_df['classification'] == -1).sum())
     
 c1, c2 = st.columns([1, 1])
