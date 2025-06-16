@@ -9,7 +9,6 @@ import plotly.express as px
 
 
 from pavone.types import PavoneKey
-from pavone.process import savgol_smoothing
 
 
 def plot_force_vs_time(ax: Axes, data: pd.DataFrame, label: str = "", **kwargs):
@@ -75,9 +74,6 @@ def plot_data_summary(
     contact_point: Optional[pd.Series] = None,
     pull_off_point: Optional[pd.Series] = None,
 ):
-
-    from pavone.process import get_contact_point, get_pull_off_point
-    from pavone.analyze import find_transition_point
 
     fig, axs = plt.subplots(1, 4, figsize=(16, 4))
 

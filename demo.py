@@ -9,7 +9,7 @@ Features:
 
 Outputs:
 - Work of adhesion (Wad)
-- 
+-
 
 
 
@@ -22,29 +22,22 @@ Adding columns
 
 
 Visualization:
-- Plotting the Wad or pull-off force vs. 
+- Plotting the Wad or pull-off force vs.
 
 """
 
-# pavone_data = process_all_pavone_data(
-#     # "/Users/devoncallan/Documents/GitHub/PavoneAnalyzer/test_data/2024.04.11 and 04.13",
-#     # "/Users/devoncallan/Documents/GitHub/PavoneAnalyzer/test_data/2024.04.11 also",
-#     "/Users/devoncallan/Documents/GitHub/PavoneAnalyzer/test_data",
-#     "/Users/devoncallan/Documents/GitHub/PavoneAnalyzer/test_data/processed",
-# )
-# processed_paths = pavone_data["output_filepath"].tolist()
-import streamlit as st
-import pandas as pd
-import plotly.graph_objects as go
 from typing import Dict, Tuple, Optional
 import os
 from pathlib import Path
 
-# Assuming you have these functions from your existing code
-# from your_module import process_all_pavone_data, process_data, split_by_timings
+import streamlit as st
+import pandas as pd
+import plotly.graph_objects as go
 
-from pavone.process import process_all_pavone_data, process_data, split_by_timings
 from pavone.plot import plot_force_vs_displacement_plotly
+from pavone.process import load_pavone_data, process_data
+from pavone.experiment import split_by_phase
+
 
 @st.cache_data
 def load_all_pavone_data(data_dir: str, processed_dir: str) -> pd.DataFrame:
@@ -52,7 +45,7 @@ def load_all_pavone_data(data_dir: str, processed_dir: str) -> pd.DataFrame:
     Cache the initial data loading and processing.
     This will only run once unless the directories change.
     """
-    return process_all_pavone_data(data_dir, processed_dir)
+    return load_pavone_data(data_dir, processed_dir)
 
 
 @st.cache_data
@@ -75,11 +68,7 @@ def load_and_process_single_file(
     data, contact_point, pull_off_point = process_data(data, row)
 
     # Split into phases
-    approach_data, dwell_data, retract_data = split_by_timings(data, row)
-    
-    # print("Approach Data:", approach_data.head())
-    # print("Dwell Data:", dwell_data.head())
-    # print("Retract Data:", retract_data.head())
+    approach_data, dwell_data, retract_data = split_by_phase(data, row)
 
     return data, contact_point, pull_off_point, approach_data, dwell_data, retract_data
 
