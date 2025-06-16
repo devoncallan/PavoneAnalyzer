@@ -1,121 +1,156 @@
 import streamlit as st
-import zipfile
-import os
-import io
 import pandas as pd
-import matplotlib.pyplot as plt
-from Pavone_Indent_Analysis import parse_file, extract_contact_points_from_data
+import plotly.graph_objects as go
+from streamlit.delta_generator import DeltaGenerator
+from typing import List, Optional
 
-from parse_pavone import parse_pavone_filepath, locate_pavone_data, create_new_classification_file, get_classification_file, update_classification, plot_pavone_data, read_pavone_data
+from components.select import selection_panel
 
-st.set_page_config(layout="wide")
+# Mock data for demonstration
+def create_mock_data():
+    """Create some mock data to demonstrate the UI"""
+    samples = ["Sample_A", "Sample_B", "Sample_C", "Sample_D", "Sample_E"]
+    protocols = [
+        "depths_1um",
+        "depths_2um",
+        "depths_3um",
+        "dwell_10s",
+        "dwell_100s",
+        "retractSpeed_0p2",
+        "retractSpeed_20",
+    ]
 
-# Initialize session state for current index if it doesn't already exist
-if 'current_index' not in st.session_state:
-    st.session_state.current_index = 0
-    
+    mock_experiments = []
+    for sample in samples:
+        for protocol in protocols:
+            # 2-3 replicates per sample+protocol
+            for rep in range(2):
+                mock_experiments.append(
+                    {
+                        "sample_id": sample,
+                        "protocol": protocol,
+                        "replicate": rep,
+                        "depth_um": (
+                            1.0
+                            if "depths_1um" in protocol
+                            else (
+                                2.0
+                                if "depths_2um" in protocol
+                                else 3.0 if "depths_3um" in protocol else 2.0
+                            )
+                        ),
+                        "dwell_s": (
+                            10.0
+                            if "dwell_10s" in protocol
+                            else 100.0 if "dwell_100s" in protocol else 1.0
+                        ),
+                        "retract_speed_um_s": (
+                            0.2
+                            if "retractSpeed_0p2" in protocol
+                            else 20.0 if "retractSpeed_20" in protocol else 2.0
+                        ),
+                    }
+                )
 
-def increment_index(max_index):
-    if st.session_state.current_index < max_index - 1:
-        st.session_state.current_index += 1
-    else:
-        st.session_state.current_index = 0
-
-# Locate Pavone data from the specified directory
-data_dir = '2024_07_08_ChemspeedSamples'
-pavone_files = locate_pavone_data(data_dir)
-num_files = len(pavone_files)
-
-# Get the current classification file
-class_file_path = f'{data_dir}.csv'
-if os.path.exists(class_file_path):
-    class_df = get_classification_file(pavone_files, class_file_path)
-else:
-    class_df = create_new_classification_file(pavone_files, class_file_path)
-
-pavone_files = class_df['filepath'].tolist()
-num_classified = num_files - int((class_df['classification'] == -1).sum())
-    
-c1, c2 = st.columns([1, 1])
-c1.title('Pavone Data Classifier:')
-c2.title(f'{num_classified} / {num_files} classified')
-
-if num_classified >= num_files:
-    st.balloons()
-
-# Define streamlit panels
-c1, c2 = st.columns([1, 1])
-c1L, c1C, c1R= c1.columns([1, 1, 1])
-c2L, c2R = c2.columns([1, 1])
-
-
-c1L.markdown('##### Jump to index:')
-new_index = c1C.number_input('Jump to index', min_value=0, max_value=num_files-1, value=st.session_state.current_index, label_visibility='collapsed')
-if new_index != st.session_state.current_index:
-    st.session_state.current_index = new_index
-    st.rerun()
-    
-if c1R.button('Next unclassified ➡️', use_container_width=True):
-    next_unclassified = class_df[class_df['classification'] == -1].index[0]
-    st.session_state.current_index = next_unclassified
-    st.rerun()
-    
-
-# Define bad and good classification buttons
-if c2L.button(':thumbsdown:', type='secondary', use_container_width=True):
-    update_classification(class_df, st.session_state.current_index, 0)
-    class_df.to_csv(class_file_path, index=False)
-    increment_index(max_index=num_files)
-    st.rerun()
-
-if c2R.button(label=':thumbsup:', type='primary', use_container_width=True):
-    update_classification(class_df, st.session_state.current_index, 1)
-    class_df.to_csv(class_file_path, index=False)
-    increment_index(max_index=num_files)
-    st.rerun()
+    return pd.DataFrame(mock_experiments)
 
 
-file_path = pavone_files[st.session_state.current_index]
-file_info = dict(class_df.loc[st.session_state.current_index])
-metadata, data_df = read_pavone_data(file_path)
+def create_mock_plot():
+    """Create a simple mock plot"""
+    fig = go.Figure()
 
-c1.markdown('')
-c1.markdown(f'#### Experiment {st.session_state.current_index} Info:')
-c1.write(file_info)
+    # Add some mock traces
+    import numpy as np
 
-# Define string and color based on classification
-class_val = class_df.loc[st.session_state.current_index, 'classification']
-class_str = 'Good' if class_val == 1 else 'Bad' if class_val == 0 else 'Unclassified'
-class_color = 'green' if class_str == 'Good' else 'red' if class_str == 'Bad' else 'gray'
+    x = np.linspace(-3, 3, 100)
 
-# Use the color in the markdown with inline CSS
-c2L, c2R = c2.columns([6, 1])
-c2L.markdown(f'#### Classification: <span style="color: {class_color};">{class_str}</span>', unsafe_allow_html=True)
+    for i, name in enumerate(["Condition 1", "Condition 2", "Condition 3"]):
+        y = np.sin(x + i) * np.exp(-(x**2) / 5) * (i + 1)
+        fig.add_trace(go.Scatter(x=x, y=y, mode="lines", name=name, line=dict(width=2)))
 
+    fig.update_layout(
+        title="Force vs Displacement",
+        xaxis_title="Displacement (μm)",
+        yaxis_title="Force (μN)",
+        height=500,
+        template="plotly_white",
+    )
 
-# Plot Pavone data
-fig, ax, img = plot_pavone_data(data_df, savefig=True)
-
-image_filename = file_info['filename'].replace('.txt', '.png')
-
-btn = c2R.download_button(
-   label=":floppy_disk:",
-   data=img,
-   file_name=image_filename,
-   mime="image/png",
-   use_container_width=True
-)
-c2.pyplot(fig)
+    return fig
 
 
-### Display
-c = st.container()
-c.divider()
-c1, c2 = c.columns([1, 1])
-c1.markdown('#### Download data:')
-c.write(class_df)
+def main():
+    st.set_page_config(page_title="Pavone Analysis", layout="wide")
 
-if c.button('Reset classifications'):
-    class_df = create_new_classification_file(pavone_files, class_file_path)
-    class_df.to_csv(class_file_path, index=False)
-    st.rerun()
+    # Load mock data
+    df = create_mock_data()
+
+    st.title("🔬 Pavone Analysis Tool")
+
+    # Mode selection
+    analysis_mode = st.radio(
+        "Analysis Mode:",
+        ["Single Protocol, Multiple Samples", "Single Sample, Multiple Protocols"],
+        horizontal=True,
+    )
+
+    # st.divider()
+
+    # Main layout: plot on left, controls on right
+    col_plot, col_controls = st.columns([2, 1])
+
+    with col_plot:
+        st.subheader("Results")
+
+        # Mock plot for now
+        fig = create_mock_plot()
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Simple summary
+        st.info(f"📊 Showing 3 conditions • Mode: {analysis_mode}")
+
+    with col_controls:
+        st.subheader("Controls")
+
+        # Determine multi-selection behavior based on mode
+        if analysis_mode == "Single Protocol, Multiple Samples":
+            sample_multi = True
+            protocol_multi = False
+        else:  # Single Sample, Multiple Protocols
+            sample_multi = False
+            protocol_multi = True
+
+        # Sample selection using component function
+        sample_options = df["sample_id"].unique().tolist()
+        selected_samples = exp_id_select(st, exp_ids=sample_options, multi=sample_multi)
+
+        st.divider()
+
+        # Protocol selection using component function
+        st.markdown("**Select Protocols:**")
+        depth_selection, dwell_selection, retract_selection = exp_condition_select(
+            st, multi=protocol_multi
+        )
+
+        st.divider()
+
+        # Show current selections
+        st.markdown("**Current Selection:**")
+        st.write(f"Samples: {len(selected_samples)} selected")
+
+        # Count active protocols based on selections
+        active_protocols = []
+        active_protocols.extend([f"{d}μm depth" for d in depth_selection])
+        active_protocols.extend([f"{d}s dwell" for d in dwell_selection])
+        active_protocols.extend([f"{r}μm/s retract" for r in retract_selection])
+
+        if not active_protocols:
+            st.write("Protocol: Baseline (2μm, 1s, 2μm/s)")
+        else:
+            st.write(f"Protocols: {len(active_protocols)} selected")
+            for protocol in active_protocols:
+                st.write(f"  • {protocol}")
+
+
+if __name__ == "__main__":
+    main()

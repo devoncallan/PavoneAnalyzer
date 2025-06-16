@@ -1,5 +1,5 @@
 import pandas as pd
-from typing import Tuple, Optional, Dict
+from typing import Tuple, Optional, Dict, List
 
 from .types import PavoneKey
 
@@ -159,3 +159,43 @@ def add_experimental_conditions(
     # quit()
 
     return data
+
+
+def filter_experiments(
+    data: pd.DataFrame,
+    sample_ids: List[str],
+    depth_selections: List[float],
+    dwell_selections: List[float],
+    retract_speed_selections: List[float],
+) -> pd.DataFrame:
+    """
+    Filter experiments based on selected conditions.
+
+    Args:
+        data (pd.DataFrame): DataFrame containing experiment data
+        sample_ids (List[str]): List of sample IDs to filter
+        depth_selections (List[float]): Selected depths
+        dwell_selections (List[float]): Selected dwell times
+        retract_speed_selections (List[float]): Selected retraction speeds
+
+    Returns:
+        pd.DataFrame: Filtered DataFrame
+    """
+
+    # Ensure all selections are provided
+    if (
+        not sample_ids
+        or not depth_selections
+        or not dwell_selections
+        or not retract_speed_selections
+    ):
+        return pd.DataFrame()
+
+    filtered_data = data[
+        (data["sample_id"].isin(sample_ids))
+        & (data["depth_um"].isin(depth_selections))
+        & (data["dwell_time_s"].isin(dwell_selections))
+        & (data["retract_speed_ums"].isin(retract_speed_selections))
+    ]
+
+    return filtered_data.reset_index(drop=True)

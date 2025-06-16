@@ -47,7 +47,7 @@ def read_pavone_data(filepath: str) -> Tuple[dict, pd.DataFrame]:
             raw_data[col] = pd.to_numeric(raw_data[col])
         except ValueError:
             pass  # Keep as string if conversion fails
-        
+
     for key, value in metadata.items():
         try:
             metadata[key] = pd.to_numeric(value)
@@ -86,6 +86,7 @@ def parse_pavone_filepath(filepath: str) -> Dict[str, str]:
         "experiment_code": exp_code,
         "plate_number": plate_num,
         "well_number": well_num,
+        "sample_id": "_".join([plate_num, well_num]),
         "scan_info": scan_info,
         "S": S,
         "X": X,

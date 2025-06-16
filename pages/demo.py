@@ -34,43 +34,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 
-from pavone.plot import plot_force_vs_displacement_plotly
-from pavone.process import load_pavone_data, process_data
-from pavone.experiment import split_by_phase
-
-
-@st.cache_data
-def load_all_pavone_data(data_dir: str, processed_dir: str) -> pd.DataFrame:
-    """
-    Cache the initial data loading and processing.
-    This will only run once unless the directories change.
-    """
-    return load_pavone_data(data_dir, processed_dir)
-
-
-@st.cache_data
-def load_and_process_single_file(
-    filepath: str, row_dict: dict
-) -> Tuple[
-    pd.DataFrame, pd.Series, pd.Series, pd.DataFrame, pd.DataFrame, pd.DataFrame
-]:
-    """
-    Cache the loading and processing of individual files.
-    Uses filepath as the cache key so each file is only processed once.
-    """
-    # Convert row_dict back to Series for compatibility
-    row = pd.Series(row_dict)
-
-    # Load the raw data
-    data = pd.read_csv(filepath)
-
-    # Process the data to get contact and pull-off points
-    data, contact_point, pull_off_point = process_data(data, row)
-
-    # Split into phases
-    approach_data, dwell_data, retract_data = split_by_phase(data, row)
-
-    return data, contact_point, pull_off_point, approach_data, dwell_data, retract_data
+from ..components.load import load_pavone_data, load_experiment_data, directory_input
 
 
 # @st.cache_data
@@ -85,13 +49,19 @@ def create_plotly_figure(
     """
     Cache the figure creation. This prevents recreating the same plot multiple times.
     """
-    return plot_force_vs_displacement_plotly(
+
+    from pavone.plot import plot_split_phase
+
+    return plot_split_phase(
         approach_data=approach_data,
         dwell_data=dwell_data,
         retract_data=retract_data,
         contact_point=contact_point,
         pull_off_point=pull_off_point,
+        plot_type="fvd",  # Force vs Displacement
         title=title,
+        height=600,
+        width=800,
     )
 
 
@@ -100,28 +70,9 @@ def main():
 
     st.title("🔬 Pavone Indentation Data Viewer")
 
-    # Sidebar for configuration
-    with st.sidebar:
-        st.header("Configuration")
-
-        # Directory inputs
-        data_dir = st.text_input(
-            "Data Directory",
-            value="/Users/devoncallan/Documents/GitHub/PavoneAnalyzer/test_data",
-            help="Path to your raw Pavone data directory",
-        )
-
-        processed_dir = st.text_input(
-            "Processed Directory",
-            value="/Users/devoncallan/Documents/GitHub/PavoneAnalyzer/test_data/processed",
-            help="Path to store/find processed data",
-        )
-
-        # Load data button
-        if st.button("🔄 Load/Refresh Data", type="primary"):
-            # Clear cache to force reload
-            st.cache_data.clear()
-            st.rerun()
+    data_dir, processed_dir = directory_input(
+        data_dir="/Users/devoncallan/Documents/GitHub/PavoneAnalyzer/test_data"
+    )
 
     # Check if directories exist
     if not os.path.exists(data_dir):
@@ -129,18 +80,10 @@ def main():
         return
 
     # Load all pavone data (cached)
-    try:
-        with st.spinner("Loading Pavone data..."):
-            pavone_data = load_all_pavone_data(data_dir, processed_dir)
+    pavone_data = load_pavone_data(data_dir, processed_dir)
 
-        st.success(f"Loaded {len(pavone_data)} files")
-
-    except Exception as e:
-        st.error(f"Error loading data: {str(e)}")
-        return
-
-    if len(pavone_data) == 0:
-        st.warning("No data files found. Check your directory paths.")
+    if pavone_data is None:
+        st.error("Failed to load Pavone data.")
         return
 
     # Create file selection interface
@@ -194,7 +137,7 @@ def main():
                 approach_data,
                 dwell_data,
                 retract_data,
-            ) = load_and_process_single_file(selected_row["output_filepath"], row_dict)
+            ) = load_experiment_data(selected_row["output_filepath"], row_dict)
 
     except Exception as e:
         st.error(f"Error processing file: {str(e)}")

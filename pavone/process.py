@@ -26,7 +26,7 @@ def process_raw_data(raw_data: pd.DataFrame) -> pd.DataFrame:
     return data
 
 
-def load_pavone_data(data_dir: str, output_dir: str):
+def load_pavone_data(data_dir: str, output_dir: str) -> pd.DataFrame:
     from pavone.parse import read_pavone_data, parse_pavone_filepath, locate_pavone_data
     from pavone.experiment import add_phase_timings, add_experimental_conditions
 
