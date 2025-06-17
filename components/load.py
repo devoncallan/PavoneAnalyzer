@@ -1,5 +1,5 @@
 import os
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Dict, List
 
 import streamlit as st
 import pandas as pd
@@ -17,15 +17,15 @@ def load_pavone_data(data_dir: str, processed_dir: str) -> Optional[pd.DataFrame
         with st.spinner("Loading Pavone data..."):
             pavone_data = load_pavone_data(data_dir, processed_dir)
 
-        with st.sidebar:
-            st.success(f"Loaded {len(pavone_data)} files")
+        # with st.sidebar:
+        st.sidebar.success(f"Loaded {len(pavone_data)} files")
 
     except Exception as e:
-        st.error(f"Error loading data: {str(e)}")
+        st.sidebar.error(f"Error loading data: {str(e)}")
         return
 
     if len(pavone_data) == 0:
-        st.warning("No data files found. Check your directory paths.")
+        st.sidebar.warning("No data files found. Check your directory paths.")
         return
 
     return pavone_data
@@ -51,7 +51,6 @@ def load_experiment_data(
     data = pd.read_csv(filepath)
 
     # Downsample the data
-    data = data.iloc[::10, :]  # Downsample by taking every 10th row
 
     # Process the data to get contact and pull-off points
     data, contact_point, pull_off_point = process_data(data, row)
@@ -60,6 +59,46 @@ def load_experiment_data(
     approach_data, dwell_data, retract_data = split_by_phase(data, row)
 
     return data, contact_point, pull_off_point, approach_data, dwell_data, retract_data
+
+
+def load_experiments_data(
+    summary_data: pd.DataFrame,
+) -> Dict[
+    Tuple[str, str],
+    List[
+        Tuple[
+            pd.DataFrame, pd.Series, pd.Series, pd.DataFrame, pd.DataFrame, pd.DataFrame
+        ]
+    ],
+]:
+    """
+    Load and process multiple experiments based on the summary DataFrame.
+    Returns a DataFrame with processed data for each experiment.
+    """
+
+    from pavone.experiment import label_experiments
+
+    labeled_summary_data = label_experiments(summary_data)
+
+    experiments_data = {}
+    # Loop through each labeled data and load_experiment_data
+    for label, summary_data in labeled_summary_data.items():
+
+        for i, row in summary_data.iterrows():
+            try:
+                bundled_data = load_experiment_data(
+                    row["output_filepath"], row.to_dict()
+                )
+
+                if label not in experiments_data:
+                    experiments_data[label] = []
+
+                experiments_data[label].append(bundled_data)
+
+            except Exception as e:
+                st.error(f"Error processing {row['output_filepath']}: {str(e)}")
+
+    return experiments_data
 
 
 def directory_input(

@@ -1,4 +1,4 @@
-from typing import Optional, Dict
+from typing import Optional, Dict, List, Tuple
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -49,13 +49,21 @@ STYLES = {
         + "Force: %{y:.3f} μN<br>"
         + "<extra></extra>",
     ),
-    "Overlay": dict(
+    "OverlayPrimary": dict(
         mode="lines",
         line=dict(
             color="black",
             width=1,
         ),
-        opacity=0.5,
+        opacity=0.9,
+    ),
+    "OverlaySecondary": dict(
+        mode="lines",
+        line=dict(
+            color="gray",
+            width=1,
+        ),
+        opacity=0.15,
     ),
     "Contact Point": dict(
         mode="markers",
@@ -90,7 +98,7 @@ STYLES = {
 
 PLOT_STYLES = {
     "fvd": dict(
-        xaxis=dict(title="Displacement (μm)", range=[-5, 5]),
+        xaxis=dict(title="Displacement (μm)", range=[-3, None]),
         yaxis=dict(title="Force (μN)"),
         title="Force vs Displacement",
     ),
@@ -143,7 +151,6 @@ def plot(
     style_key: Optional[str] = None,
     **kwargs,
 ):
-
     # Determine the x and y data based on the plot type
     if plot_type == "fvd":
         x = data[PavoneKey.displacement]
@@ -157,16 +164,23 @@ def plot(
     else:
         raise ValueError(f"Unsupported plot type: {plot_type}")
 
-    # Update kwargs with style if provided
+    # Start with empty base style
+    base_style = {}
+
+    # Get style from STYLES if provided
+    style_dict = {}
     if style_key is not None:
         if style_key in STYLES:
-            kwargs.update(STYLES[style_key])
+            style_dict = STYLES[style_key]
         else:
             raise ValueError(
                 f"Style key '{style_key}' not found in STYLES. Available keys: {list(STYLES.keys())}"
             )
 
-    fig.add_trace(go.Scatter(x=np.array(x), y=np.array(y), **kwargs))
+    # Merge: base_style < style_dict < kwargs
+    final_style = {**base_style, **style_dict, **kwargs}
+
+    fig.add_trace(go.Scatter(x=np.array(x), y=np.array(y), **final_style))
 
 
 def add_zero_lines(fig: go.Figure, x_zero: bool = True, y_zero: bool = True, **kwargs):
@@ -255,19 +269,36 @@ def plot_split_phase(
 
 
 def plot_exp_overlay(
-    data_dict: Dict[str, pd.DataFrame],
+    data_dict: Dict[str, List[Tuple[pd.DataFrame, ...]]],
     plot_type: str = "fvd",
     **kwargs,
 ) -> go.Figure:
 
     fig = create_figure(plot_type=plot_type, **kwargs)
 
-    for label, data in data_dict.items():
-        if not isinstance(data, pd.DataFrame):
-            raise ValueError(f"Data for '{label}' must be a DataFrame.")
+    # colors = ["blue", "orange", "green", "red", "purple"]
+    colors = ["#2E86AB", "#F18F01", "#2ca02c", "#A23B72", "#5D737E"]
 
-        # Plot the data with overlay style
-        plot(fig, data, plot_type=plot_type, style_key="Overlay", name=label)
+    for i, (label, bundled_data_list) in enumerate(data_dict.items()):
+        for trial_num, bundled_data in enumerate(bundled_data_list):
+
+            data = bundled_data[0]
+            if not isinstance(data, pd.DataFrame):
+                raise ValueError(f"Data for '{label}' must be a DataFrame.")
+
+            # Plot the data with overlay style
+            plot(
+                fig,
+                data,
+                plot_type=plot_type,
+                style_key="OverlayPrimary" if trial_num == 0 else "OverlaySecondary",
+                name=f"{label} {trial_num}",
+                line=dict(
+                    color=colors[i % len(colors)],
+                    width=1,
+                ),
+                # line_color=colors[i % len(colors)],
+            )
 
     # Add zero reference lines
     if plot_type == "fvd":

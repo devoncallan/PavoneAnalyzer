@@ -1,2 +1,22 @@
 [server]
 maxUploadSize=5000
+
+[theme]
+
+# Primary accent for interactive elements
+primaryColor="#7792e3"
+
+# Background color for the main content area
+backgroundColor="#f0eee6"
+
+# Background color for sidebar and most interactive widgets
+secondaryBackgroundColor = '#E0E0E0'
+
+# Color used for almost all text
+# textColor="#000000"
+textColor = "#3d3d3a"
+
+# Font family for all text in the app, except code blocks
+# Accepted values (serif | sans serif | monospace) 
+# Default: "sans serif"
+font = "sans serif"

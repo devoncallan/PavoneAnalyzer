@@ -1,5 +1,5 @@
 import pandas as pd
-from typing import Tuple, Optional, Dict, List
+from typing import Tuple, Optional, Dict, List, Any
 
 from .types import PavoneKey
 
@@ -116,10 +116,11 @@ def map_experimental_conditions(condition_str: str) -> Optional[Dict[str, float]
     # Retraction Speeds: 0.2, 2, 20
     elif "retractSpeed_0p2" in condition_str:
         conditions["retract_speed_ums"] = 0.2
-    elif "retractSpeed_2" in condition_str:
-        conditions["retract_speed_ums"] = 2.0
     elif "retractSpeed_20" in condition_str:
         conditions["retract_speed_ums"] = 20.0
+    elif "retractSpeed_2" in condition_str:
+        conditions["retract_speed_ums"] = 2.0
+
     else:
         print(f"Unknown experimental condition: {condition_str}")
         return None
@@ -161,6 +162,46 @@ def add_experimental_conditions(
     return data
 
 
+# def filter_experiments(
+#     data: pd.DataFrame,
+#     sample_ids: List[str],
+#     depth_selections: List[float],
+#     dwell_selections: List[float],
+#     retract_speed_selections: List[float],
+# ) -> pd.DataFrame:
+#     """
+#     Filter experiments based on selected conditions.
+
+#     Args:
+#         data (pd.DataFrame): DataFrame containing experiment data
+#         sample_ids (List[str]): List of sample IDs to filter
+#         depth_selections (List[float]): Selected depths
+#         dwell_selections (List[float]): Selected dwell times
+#         retract_speed_selections (List[float]): Selected retraction speeds
+
+#     Returns:
+#         pd.DataFrame: Filtered DataFrame
+#     """
+
+#     # Ensure all selections are provided
+#     if (
+#         not sample_ids
+#         or not depth_selections
+#         or not dwell_selections
+#         or not retract_speed_selections
+#     ):
+#         return pd.DataFrame()
+
+#     filtered_data = data[
+#         (data["sample_id"].isin(sample_ids))
+#         & (data["depth_um"].isin(depth_selections))
+#         & (data["dwell_time_s"].isin(dwell_selections))
+#         & (data["retract_speed_ums"].isin(retract_speed_selections))
+#     ]
+
+#     return filtered_data.reset_index(drop=True)
+
+
 def filter_experiments(
     data: pd.DataFrame,
     sample_ids: List[str],
@@ -170,32 +211,120 @@ def filter_experiments(
 ) -> pd.DataFrame:
     """
     Filter experiments based on selected conditions.
-
-    Args:
-        data (pd.DataFrame): DataFrame containing experiment data
-        sample_ids (List[str]): List of sample IDs to filter
-        depth_selections (List[float]): Selected depths
-        dwell_selections (List[float]): Selected dwell times
-        retract_speed_selections (List[float]): Selected retraction speeds
-
-    Returns:
-        pd.DataFrame: Filtered DataFrame
     """
 
-    # Ensure all selections are provided
+    # Debug: Print what we received
+    print("=== DEBUG filter_experiments ===")
+    print(f"Data shape: {data.shape}")
+    print(f"Sample IDs: {sample_ids} (type: {type(sample_ids)})")
+    print(f"Depth selections: {depth_selections} (type: {type(depth_selections)})")
+    print(f"Dwell selections: {dwell_selections} (type: {type(dwell_selections)})")
+    print(
+        f"Retract speed selections: {retract_speed_selections} (type: {type(retract_speed_selections)})"
+    )
+
+    # Check if any selections are empty
     if (
         not sample_ids
         or not depth_selections
         or not dwell_selections
         or not retract_speed_selections
     ):
+        print("One or more selections are empty, returning empty DataFrame")
         return pd.DataFrame()
 
-    filtered_data = data[
-        (data["sample_id"].isin(sample_ids))
-        & (data["depth_um"].isin(depth_selections))
-        & (data["dwell_time_s"].isin(dwell_selections))
-        & (data["retract_speed_ums"].isin(retract_speed_selections))
-    ]
+    # Debug: Check data columns and sample values
+    print(f"Available columns: {list(data.columns)}")
+    if "sample_id" in data.columns:
+        print(f"Unique sample_ids in data: {data['sample_id'].unique()}")
+    if "depth_um" in data.columns:
+        print(f"Unique depth_um in data: {data['depth_um'].unique()}")
+    if "dwell_time_s" in data.columns:
+        print(f"Unique dwell_time_s in data: {data['dwell_time_s'].unique()}")
+    if "retract_speed_ums" in data.columns:
+        print(f"Unique retract_speed_ums in data: {data['retract_speed_ums'].unique()}")
 
+    try:
+        # Apply filters one by one to see which one fails
+        print("Applying sample_id filter...")
+        mask1 = data["sample_id"].isin(sample_ids)
+        print(f"Sample filter result: {mask1.sum()} matches")
+
+        print("Applying depth_um filter...")
+        mask2 = data["depth_um"].isin(depth_selections)
+        print(f"Depth filter result: {mask2.sum()} matches")
+
+        print("Applying dwell_time_s filter...")
+        mask3 = data["dwell_time_s"].isin(dwell_selections)
+        print(f"Dwell filter result: {mask3.sum()} matches")
+
+        print("Applying retract_speed_ums filter...")
+        mask4 = data["retract_speed_ums"].isin(retract_speed_selections)
+        print(f"Retract speed filter result: {mask4.sum()} matches")
+
+        print("Combining all filters...")
+        combined_mask = mask1 & mask2 & mask3 & mask4
+        print(f"Combined filter result: {combined_mask.sum()} matches")
+
+        filtered_data = data[combined_mask]
+
+    except Exception as e:
+        print(f"Error in filtering: {e}")
+        print(f"Error type: {type(e)}")
+        import traceback
+
+        traceback.print_exc()
+        return pd.DataFrame()
+
+    print(f"Returning filtered data with shape: {filtered_data.shape}")
     return filtered_data.reset_index(drop=True)
+
+
+def label_experiments(
+    data: pd.DataFrame,
+) -> Dict[Tuple[str, str], pd.DataFrame]:
+
+    labeled_data = {}
+    for _, row in data.iterrows():
+        sample_id = row["sample_id"]
+        depth = row["depth_um"]
+        dwell_time = row["dwell_time_s"]
+        retract_speed = row["retract_speed_ums"]
+
+        key = (sample_id, f"{depth}um_{dwell_time}s_{retract_speed}um/s")
+        if key not in labeled_data:
+            labeled_data[key] = pd.DataFrame(columns=data.columns)
+
+        labeled_data[key] = pd.concat(
+            [labeled_data[key], row.to_frame().T], ignore_index=True
+        )
+    return labeled_data
+
+
+def extract_data_for_plotting(
+    experiments_data: Dict[str, List[Any]], group_by: Optional[str] = None
+) -> Dict[str, List[pd.DataFrame]]:
+    """
+    Extract the main data from experiments_data for plotting.
+    Convert from experiment tuples to simple data dict for plot_exp_overlay.
+    Args:
+        experiments_data (Dict): Dictionary containing experiment data
+        group_by (Optional[str]): Grouping key, can be 'sample_id' or 'protocol'
+
+    """
+    data_dict = {}
+    for (sample_id, protocol), bundled_data_list in experiments_data.items():
+
+        if group_by is None:
+            label = f"{sample_id}_{protocol}"
+        elif group_by == "sample_id":
+            label = sample_id
+        elif group_by == "protocol":
+            label = protocol
+
+        # if label not in data_dict:
+            # data_dict[label] = []
+
+        data_dict[label] = bundled_data_list
+
+    return data_dict

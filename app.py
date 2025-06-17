@@ -3,153 +3,115 @@ import pandas as pd
 import plotly.graph_objects as go
 from streamlit.delta_generator import DeltaGenerator
 from typing import List, Optional
+import os
 
 from components.select import selection_panel
-
-# Mock data for demonstration
-def create_mock_data():
-    """Create some mock data to demonstrate the UI"""
-    samples = ["Sample_A", "Sample_B", "Sample_C", "Sample_D", "Sample_E"]
-    protocols = [
-        "depths_1um",
-        "depths_2um",
-        "depths_3um",
-        "dwell_10s",
-        "dwell_100s",
-        "retractSpeed_0p2",
-        "retractSpeed_20",
-    ]
-
-    mock_experiments = []
-    for sample in samples:
-        for protocol in protocols:
-            # 2-3 replicates per sample+protocol
-            for rep in range(2):
-                mock_experiments.append(
-                    {
-                        "sample_id": sample,
-                        "protocol": protocol,
-                        "replicate": rep,
-                        "depth_um": (
-                            1.0
-                            if "depths_1um" in protocol
-                            else (
-                                2.0
-                                if "depths_2um" in protocol
-                                else 3.0 if "depths_3um" in protocol else 2.0
-                            )
-                        ),
-                        "dwell_s": (
-                            10.0
-                            if "dwell_10s" in protocol
-                            else 100.0 if "dwell_100s" in protocol else 1.0
-                        ),
-                        "retract_speed_um_s": (
-                            0.2
-                            if "retractSpeed_0p2" in protocol
-                            else 20.0 if "retractSpeed_20" in protocol else 2.0
-                        ),
-                    }
-                )
-
-    return pd.DataFrame(mock_experiments)
-
-
-def create_mock_plot():
-    """Create a simple mock plot"""
-    fig = go.Figure()
-
-    # Add some mock traces
-    import numpy as np
-
-    x = np.linspace(-3, 3, 100)
-
-    for i, name in enumerate(["Condition 1", "Condition 2", "Condition 3"]):
-        y = np.sin(x + i) * np.exp(-(x**2) / 5) * (i + 1)
-        fig.add_trace(go.Scatter(x=x, y=y, mode="lines", name=name, line=dict(width=2)))
-
-    fig.update_layout(
-        title="Force vs Displacement",
-        xaxis_title="Displacement (μm)",
-        yaxis_title="Force (μN)",
-        height=500,
-        template="plotly_white",
-    )
-
-    return fig
+from components.load import (
+    load_pavone_data,
+    load_experiments_data,
+    directory_input,
+)
+from pavone.experiment import extract_data_for_plotting
+from pavone.plot import plot_exp_overlay
 
 
 def main():
     st.set_page_config(page_title="Pavone Analysis", layout="wide")
 
-    # Load mock data
-    df = create_mock_data()
-
-    st.title("🔬 Pavone Analysis Tool")
-
-    # Mode selection
-    analysis_mode = st.radio(
-        "Analysis Mode:",
-        ["Single Protocol, Multiple Samples", "Single Sample, Multiple Protocols"],
-        horizontal=True,
+    st.html("<style>[data-testid='stHeaderActionElements'] {display: none;}</style>")
+    st.markdown(
+        """
+        <style>
+               .block-container {
+                    padding-top: 2rem;
+                    padding-bottom: 0rem;
+                    padding-left: 2rem;
+                    padding-right: 2rem;
+                }
+        </style>
+        """,
+        unsafe_allow_html=True,
     )
 
-    # st.divider()
+    st.title("Pavone Data Visualizer 🔬 ")
+
+    # Get directories
+    data_dir, processed_dir = directory_input(
+        data_dir="/Users/devoncallan/Documents/GitHub/PavoneAnalyzer/test_data"
+    )
+
+    # Check if directories exist
+    if not os.path.exists(data_dir):
+        st.error(f"Data directory does not exist: {data_dir}")
+        return
+
+    # Load all pavone data (cached)
+    summary_data = load_pavone_data(data_dir, processed_dir)
+
+    if summary_data is None:
+        st.error("Failed to load Pavone data.")
+        return
 
     # Main layout: plot on left, controls on right
     col_plot, col_controls = st.columns([2, 1])
 
-    with col_plot:
-        st.subheader("Results")
-
-        # Mock plot for now
-        fig = create_mock_plot()
-        st.plotly_chart(fig, use_container_width=True)
-
-        # Simple summary
-        st.info(f"📊 Showing 3 conditions • Mode: {analysis_mode}")
-
     with col_controls:
-        st.subheader("Controls")
+        # st.subheader("Controls")
 
-        # Determine multi-selection behavior based on mode
-        if analysis_mode == "Single Protocol, Multiple Samples":
-            sample_multi = True
-            protocol_multi = False
-        else:  # Single Sample, Multiple Protocols
-            sample_multi = False
-            protocol_multi = True
-
-        # Sample selection using component function
-        sample_options = df["sample_id"].unique().tolist()
-        selected_samples = exp_id_select(st, exp_ids=sample_options, multi=sample_multi)
-
-        st.divider()
-
-        # Protocol selection using component function
-        st.markdown("**Select Protocols:**")
-        depth_selection, dwell_selection, retract_selection = exp_condition_select(
-            st, multi=protocol_multi
+        # Use selection panel to get filtered data
+        analysis_mode, filtered_summary_data = selection_panel(
+            st.container(),
+            summary_data,
         )
 
         st.divider()
 
-        # Show current selections
-        st.markdown("**Current Selection:**")
-        st.write(f"Samples: {len(selected_samples)} selected")
+    with col_plot:
+        # st.subheader("Results")
 
-        # Count active protocols based on selections
-        active_protocols = []
-        active_protocols.extend([f"{d}μm depth" for d in depth_selection])
-        active_protocols.extend([f"{d}s dwell" for d in dwell_selection])
-        active_protocols.extend([f"{r}μm/s retract" for r in retract_selection])
+        if not filtered_summary_data.empty:
+            try:
+                with st.spinner("Loading experiment data..."):
+                    # Load individual experiments
+                    experiments_data = load_experiments_data(filtered_summary_data)
 
-        if not active_protocols:
-            st.write("Protocol: Baseline (2μm, 1s, 2μm/s)")
+                    if experiments_data:
+                        # Extract data for plotting based on analysis mode
+                        if analysis_mode == "Vary Samples":
+                            data_dict = extract_data_for_plotting(
+                                experiments_data, group_by="sample_id"
+                            )
+                        else:  # Vary Protocols
+                            data_dict = extract_data_for_plotting(
+                                experiments_data, group_by="protocol"
+                            )
+
+                        # Create overlay plot
+                        if data_dict:
+                            fig = plot_exp_overlay(
+                                data_dict,
+                                plot_type="fvd",
+                                title=f"Force vs Displacement - {analysis_mode}",
+                                # height=500,
+                                # width=800,
+                            )
+                            st.plotly_chart(fig, use_container_width=True)
+                        else:
+                            st.warning("No data available for plotting.")
+                    else:
+                        st.warning("Failed to load experiment data.")
+
+            except Exception as e:
+                st.error(f"Error processing experiments: {str(e)}")
+                # Show stack trace in expander for debugging
+                with st.expander("Error details"):
+                    st.exception(e)
+
         else:
-            st.write(f"Protocols: {len(active_protocols)} selected")
-            for protocol in active_protocols:
-                st.write(f"  • {protocol}")
+            st.warning(
+                "No experiments match your selection criteria. Please adjust your filters."
+            )
+            return
 
 
 if __name__ == "__main__":
