@@ -37,7 +37,8 @@ def main():
 
     # Get directories
     data_dir, processed_dir = directory_input(
-        data_dir="/Users/devoncallan/Documents/GitHub/PavoneAnalyzer/test_data"
+        # data_dir="/Users/devoncallan/Documents/GitHub/PavoneAnalyzer/test_data"
+        data_dir="./test_data",
     )
 
     # Check if directories exist

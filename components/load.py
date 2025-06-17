@@ -102,7 +102,8 @@ def load_experiments_data(
 
 
 def directory_input(
-    data_dir: str = "/Users/devoncallan/Documents/GitHub/PavoneAnalyzer/test_data",
+    # data_dir: str = "/Users/devoncallan/Documents/GitHub/PavoneAnalyzer/test_data",
+    data_dir: str = "./test_data",
 ) -> Optional[Tuple[str, str]]:
     """
     Create input fields for data and processed directories.
