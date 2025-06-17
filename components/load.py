@@ -103,19 +103,24 @@ def load_experiments_data(
 
 def directory_input(
     # data_dir: str = "/Users/devoncallan/Documents/GitHub/PavoneAnalyzer/test_data",
-    data_dir: str = "./test_data",
+    data_dir: str = "test_data",
 ) -> Optional[Tuple[str, str]]:
     """
     Create input fields for data and processed directories.
     Returns the selected directories.
     """
     st.sidebar.header("Data Source")
+
     data_dir = st.sidebar.text_input(
         "Data Directory",
         value=data_dir,
         help="Directory containing raw Pavone data files",
     )
-    processed_dir = os.path.join(data_dir, "processed")
+    from pathlib import Path
+
+    script_dir = Path(__file__).resolve().parent.parent
+    data_dir = script_dir / data_dir
+    processed_dir = data_dir / "processed"
 
     # Load data button
     if st.sidebar.button("🔄 Load/Refresh Data", type="primary"):
